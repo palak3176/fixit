@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FixIt Admin Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+    <!-- LEAFLET MAPS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0f1c; color: white; }
+        .font-grotesk { font-family: 'Space Grotesk', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Glassmorphism Sidebar */
+        .glass-sidebar {
+            background: rgba(19, 27, 46, 0.6);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0) 100%);
+            border-left: 3px solid #3b82f6;
+            color: #60a5fa;
+        }
+
+        /* Map Fixes */
+        .leaflet-pane { z-index: 0 !important; }
+        .leaflet-control { z-index: 0 !important; }
+        .leaflet-top, .leaflet-bottom { z-index: 0 !important; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden selection:bg-blue-500/30">
+
+    <!-- SIDEBAR -->
+    <aside class="w-72 glass-sidebar flex flex-col z-20 transition-all duration-300">
+        <div class="p-8 pb-4">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i data-lucide="shield-check" class="text-white fill-current"></i>
+                </div>
+                <span class="text-2xl font-bold font-grotesk tracking-tight">FixIt<span class="text-blue-500">.Admin</span></span>
+            </div>
+
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">Main Menu</p>
+            <nav class="space-y-1">
+                <button onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                    <i data-lucide="layout-grid" class="w-5 h-5"></i> <span class="font-medium">Dashboard</span>
+                </button>
+                <button onclick="window.switchView('monitoring')" id="nav-monitoring" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                    <i data-lucide="activity" class="w-5 h-5"></i> <span class="font-medium">Live Activity</span>
+                </button>
+                <button onclick="window.switchView('disputes')" id="nav-disputes" class="nav-item w-full flex items-center justify-between px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                    <div class="flex items-center gap-3"><i data-lucide="scale" class="w-5 h-5"></i> <span class="font-medium">Disputes</span></div>
+                    <span class="bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded-full border border-red-500/20">2</span>
+                </button>
+                <button onclick="window.switchView('listings')" id="nav-listings" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+                    <i data-lucide="users" class="w-5 h-5"></i> <span class="font-medium">Providers</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="mt-auto p-6 border-t border-white/5">
+            <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+                <div class="p-2 bg-white/5 rounded-lg group-hover:bg-blue-600 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold">Log Out</p>
+                    <p class="text-xs text-gray-500">Return to Website</p>
+                </div>
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0f1c] to-[#111827]">
+
+        <!-- HEADER -->
+        <header class="absolute top-0 left-0 right-0 h-20 flex items-center justify-between px-8 z-10">
+            <div class="flex items-center text-gray-400 text-sm">
+                <span>Overview</span> <i data-lucide="chevron-right" class="w-4 h-4 mx-2"></i> <span class="text-white font-medium" id="pageTitle">Dashboard</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-xs font-bold text-green-400">System Online</span>
+                </div>
+                <button class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors relative">
+                    <i data-lucide="bell" class="w-5 h-5 text-gray-300"></i>
+                    <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-[#0a0f1c]"></span>
+                </button>
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" class="w-10 h-10 rounded-full border border-white/20 bg-gray-800">
+            </div>
+        </header>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="main-dashboard" class="absolute inset-0 pt-24 px-8 pb-8 overflow-y-auto custom-scroll transition-opacity duration-300">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold font-grotesk text-white mb-2">Platform Overview</h1>
+                <p class="text-gray-400">Welcome back, Admin. Here's what's happening today.</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Total Providers</p>
+                            <h3 class="text-3xl font-bold text-white mt-1">124</h3>
+                        </div>
+                        <div class="p-2 bg-blue-500/20 rounded-lg text-blue-400"><i data-lucide="users"></i></div>
+                    </div>
+                    <div class="flex items-center text-xs text-green-400 bg-green-500/10 w-fit px-2 py-1 rounded">
+                        <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i> +12% this week
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-yellow-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Pending Approval</p>
+                            <h3 class="text-3xl font-bold text-yellow-400 mt-1">12</h3>
+                        </div>
+                        <div class="p-2 bg-yellow-500/20 rounded-lg text-yellow-400"><i data-lucide="clock"></i></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">Requires attention</div>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Verified Partners</p>
+                            <h3 class="text-3xl font-bold text-emerald-400 mt-1">89</h3>
+                        </div>
+                        <div class="p-2 bg-emerald-500/20 rounded-lg text-emerald-400"><i data-lucide="shield-check"></i></div>
+                    </div>
+                    <div class="w-full bg-gray-700 h-1 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-emerald-500 h-full rounded-full" style="width: 70%"></div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Active Listings</p>
+                            <h3 class="text-3xl font-bold text-purple-400 mt-1">105</h3>
+                        </div>
+                        <div class="p-2 bg-purple-500/20 rounded-lg text-purple-400"><i data-lucide="zap"></i></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">Live on platform</div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2"><i data-lucide="pie-chart" class="w-5 h-5 text-gray-400"></i> Service Distribution</h3>
+                    <div class="h-64 flex justify-center">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2"><i data-lucide="bar-chart-2" class="w-5 h-5 text-gray-400"></i> Helper Performance</h3>
+                    <div class="h-64">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LISTINGS VIEW (Hidden) -->
+        <div id="listings-view" class="absolute inset-0 pt-24 px-8 pb-8 overflow-y-auto custom-scroll hidden">
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="p-6 border-b border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#131b2e]/50">
+                    <div>
+                        <h3 class="font-bold text-xl text-white">Provider Management</h3>
+                        <p class="text-sm text-gray-400">Manage approval status and verifications</p>
+                    </div>
+                    <div class="flex gap-2 bg-[#0a0f1c] p-1 rounded-lg border border-white/10" id="listing-filters">
+                        <button onclick="window.filterTable('all')" id="btn-all" class="px-4 py-2 rounded-md text-xs font-bold bg-blue-600 text-white shadow-lg shadow-blue-500/30 transition-all">All</button>
+                        <button onclick="window.filterTable('Active')" id="btn-active" class="px-4 py-2 rounded-md text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all">Active</button>
+                        <button onclick="window.filterTable('Pending')" id="btn-pending" class="px-4 py-2 rounded-md text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all">Pending</button>
+                        <button onclick="window.filterTable('Rejected')" id="btn-rejected" class="px-4 py-2 rounded-md text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all">Rejected</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="bg-white/5 uppercase font-bold text-xs tracking-wider text-gray-300">
+                            <tr>
+                                <th class="p-5">Provider</th>
+                                <th class="p-5">Category</th>
+                                <th class="p-5">Status</th>
+                                <th class="p-5">Docs</th>
+                                <th class="p-5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5" id="listings-body">
+                            <!-- Static Data for Preview -->
+                            <tr class="hover:bg-white/5 transition-colors group">
+                                <td class="p-5 flex items-center gap-4">
+                                    <div class="relative">
+                                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Raju" class="w-10 h-10 rounded-xl bg-gray-800 object-cover">
+                                        <div class="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5 border border-[#0a0f1c]">
+                                            <i data-lucide="check" class="w-2 h-2 text-white"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-white group-hover:text-blue-400 transition-colors">Raju Pipes</div>
+                                        <div class="text-xs text-gray-500">Thane West</div>
+                                    </div>
+                                </td>
+                                <td class="p-5">
+                                    <span class="bg-white/5 border border-white/10 px-2 py-1 rounded text-xs">Plumber</span>
+                                </td>
+                                <td class="p-5">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Active
+                                    </span>
+                                </td>
+                                <td class="p-5">
+                                    <button onclick="window.viewDoc('https://api.dicebear.com/7.x/identicon/svg?seed=doc_1', 'Raju Pipes')" class="text-blue-400 hover:text-blue-300 underline text-xs flex items-center gap-1">
+                                        <i data-lucide="file-text" class="w-3 h-3"></i> View ID
+                                    </button>
+                                </td>
+                                <td class="p-5 text-right space-x-2">
+                                    <a href="#" class="inline-flex p-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-red-500 hover:text-white transition-all" title="Delete">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                             <!-- More static rows can be added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE MONITORING VIEW (Hidden) -->
+        <div id="live-monitoring" class="absolute inset-0 pt-20 hidden">
+            <div class="flex h-full">
+                <!-- Map -->
+                <div class="flex-1 relative bg-[#050b14]">
+                    <div id="map" class="w-full h-full z-0 opacity-80"></div>
+                    <!-- Map Overlay Controls -->
+                    <div class="absolute top-6 left-6 z-10 glass-card p-2 rounded-xl flex gap-2">
+                        <button onclick="window.toggleHeatmap()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all">
+                            Heatmap Density
+                        </button>
+                        <button onclick="window.toggleMarkers()" class="px-4 py-2 bg-[#131b2e] hover:bg-white/10 text-gray-300 text-xs font-bold rounded-lg border border-white/10 transition-all">
+                            Live Markers
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Feed Sidebar -->
+                <div class="w-80 glass-sidebar border-l border-white/5 flex flex-col z-10">
+                    <div class="p-6 border-b border-white/5">
+                        <h2 class="font-bold flex items-center gap-2 text-white">
+                            <span class="relative flex h-3 w-3">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
+                            Live Feed
+                        </h2>
+                        <p class="text-xs text-gray-500 mt-1">Real-time system events</p>
+                    </div>
+                    <div id="activity-feed" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll">
+                        <!-- Feed Items Injected JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DISPUTES VIEW (Hidden) -->
+        <div id="disputes-view" class="absolute inset-0 pt-24 px-8 pb-8 hidden overflow-y-auto">
+            <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <i data-lucide="scale" class="text-red-500"></i> Dispute Resolution Center
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6 rounded-2xl border-l-4 border-red-500">
+                    <div class="text-gray-400 text-xs font-bold uppercase">Open Cases</div>
+                    <div class="text-3xl font-bold text-white mt-1" id="open-disputes-count">2</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl border-l-4 border-green-500">
+                    <div class="text-gray-400 text-xs font-bold uppercase">Resolved Today</div>
+                    <div class="text-3xl font-bold text-white mt-1">5</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-sm text-gray-400">
+                    <thead class="bg-white/5 uppercase font-bold text-xs tracking-wider">
+                        <tr>
+                            <th class="p-5">Case ID</th>
+                            <th class="p-5">Reporter</th>
+                            <th class="p-5">Against</th>
+                            <th class="p-5">Issue</th>
+                            <th class="p-5">Status</th>
+                            <th class="p-5 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="disputes-table-body" class="divide-y divide-white/5">
+                        <!-- JS Injected -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Document Modal -->
+    <div id="docModal" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-[#131b2e] p-6 rounded-2xl max-w-sm w-full text-center border border-white/10 shadow-2xl animate-fade-up">
+            <h3 class="text-white font-bold mb-4 text-lg" id="docTitle">Document</h3>
+            <div class="bg-black/50 rounded-xl p-2 mb-6 border border-white/5">
+                <img id="docImg" src="" class="w-full h-64 object-contain rounded-lg">
+            </div>
+            <button onclick="document.getElementById('docModal').classList.add('hidden')" class="w-full bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">Close Viewer</button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // --- CHARTS ---
+        // Hardcoded data for preview to fix Jinja error
+        const categories = ['Plumber', 'Electrician', 'AC Repair', 'Carpenter', 'Painters', 'Pest Control'];
+        const counts = [25, 30, 15, 20, 10, 24];
+        const performance = [4.5, 4.2, 4.8, 4.0, 4.6, 4.3];
+
+        // Common Chart Options
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#9ca3af', font: { family: 'Inter' }, padding: 20 } }
+            }
+        };
+
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'doughnut',
+            data: {
+                labels: categories,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'],
+                    borderWidth: 0,
+                    hoverOffset: 10
+                }]
+            },
+            options: { ...chartOptions, cutout: '70%' }
+        });
+
+        new Chart(document.getElementById('performanceChart'), {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [{
+                    label: 'Avg Rating',
+                    data: performance,
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 6,
+                    barThickness: 20
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
+                    x: { grid: { display: false }, ticks: { color: '#6b7280' } }
+                }
+            }
+        });
+
+        // --- NAVIGATION ---
+        window.switchView = function(viewName) {
+            // Hide all views
+            ['main-dashboard', 'listings-view', 'live-monitoring', 'disputes-view'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
+            });
+
+            // Reset Nav Styles
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'text-blue-400', 'bg-blue-500/10');
+                el.classList.add('text-gray-400', 'hover:bg-white/5');
+            });
+
+            // Show Selected View & Highlight Nav
+            const navBtn = document.getElementById(`nav-${viewName}`);
+            if(navBtn) {
+                navBtn.classList.add('active');
+                navBtn.classList.remove('text-gray-400', 'hover:bg-white/5');
+            }
+
+            const titleEl = document.getElementById('pageTitle');
+            if (titleEl) {
+                titleEl.textContent = viewName.charAt(0).toUpperCase() + viewName.slice(1).replace('-', ' ');
+            }
+
+            if(viewName === 'dashboard') {
+                document.getElementById('main-dashboard').classList.remove('hidden');
+            } else if(viewName === 'listings') {
+                document.getElementById('listings-view').classList.remove('hidden');
+            } else if(viewName === 'monitoring') {
+                document.getElementById('live-monitoring').classList.remove('hidden');
+                if(!window.leafletMap) window.initMap(); else setTimeout(() => window.leafletMap.invalidateSize(), 100);
+            } else if(viewName === 'disputes') {
+                document.getElementById('disputes-view').classList.remove('hidden');
+                window.renderDisputes();
+            }
+        };
+
+        // --- FILTERING ---
+        window.filterTable = function(status) {
+            // Reset Buttons
+            const btns = document.querySelectorAll('#listing-filters button');
+            btns.forEach(b => {
+                b.className = 'px-4 py-2 rounded-md text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all';
+            });
+
+            // Activate Selected
+            const activeBtn = document.getElementById(status === 'all' ? 'btn-all' : `btn-${status.toLowerCase()}`);
+            if(activeBtn) {
+                let colorClass = 'bg-blue-600 text-white shadow-lg shadow-blue-500/30';
+                if(status === 'Active') colorClass = 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30';
+                if(status === 'Pending') colorClass = 'bg-yellow-600 text-white shadow-lg shadow-yellow-500/30';
+                if(status === 'Rejected') colorClass = 'bg-red-600 text-white shadow-lg shadow-red-500/30';
+
+                activeBtn.className = `px-4 py-2 rounded-md text-xs font-bold transition-all ${colorClass}`;
+            }
+
+            const rows = document.querySelectorAll('#listings-body tr');
+            rows.forEach(row => {
+                const statusCell = row.children[2];
+                if(statusCell) {
+                    const text = statusCell.textContent.trim();
+                    row.style.display = (status === 'all' || text.includes(status)) ? '' : 'none';
+                }
+            });
+        };
+
+        // --- MAPS ---
+        window.initMap = function() {
+            window.leafletMap = L.map('map').setView([19.0760, 72.8777], 12);
+
+            // Dark Mode Map Tiles
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(window.leafletMap);
+
+            const heatPoints = [];
+            for(let i=0; i<60; i++) {
+                const lat = 19.0 + (Math.random() * 0.2);
+                const lng = 72.8 + (Math.random() * 0.2);
+                heatPoints.push([lat, lng, 0.6]); // Intensity
+
+                // Pulsing Marker
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 4,
+                    fillColor: "#3b82f6",
+                    color: "#60a5fa",
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.8
+                }).addTo(window.leafletMap);
+            }
+
+            L.heatLayer(heatPoints, { radius: 25, blur: 15, gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'} }).addTo(window.leafletMap);
+            window.startLiveFeed();
+        };
+
+        window.startLiveFeed = function() {
+            setInterval(() => {
+                const feed = document.getElementById('activity-feed');
+                const actions = ["New Booking", "Provider Online", "Job Completed", "Payment Received"];
+                const names = ["Raju Pipes", "Cool Breeze AC", "Vijay Electric", "Anita Care"];
+                const action = actions[Math.floor(Math.random() * actions.length)];
+                const name = names[Math.floor(Math.random() * names.length)];
+
+                let icon = "activity";
+                let color = "text-blue-400";
+                if(action === "Job Completed") { icon = "check-circle"; color = "text-emerald-400"; }
+                if(action === "Payment Received") { icon = "dollar-sign"; color = "text-yellow-400"; }
+
+                const item = document.createElement('div');
+                item.className = "flex gap-3 items-start p-3 rounded-xl bg-white/5 border border-white/5 animate-fade-up";
+                item.innerHTML = `
+                    <div class="mt-1 ${color}"><i data-lucide="${icon}" class="w-4 h-4"></i></div>
+                    <div>
+                        <p class="text-sm font-bold text-gray-200">${action}</p>
+                        <p class="text-xs text-gray-500">${name} • Just now</p>
+                    </div>
+                `;
+                if(feed) {
+                    feed.insertBefore(item, feed.firstChild);
+                    if(feed.children.length > 20) feed.lastChild.remove();
+                    if(window.lucide) lucide.createIcons();
+                }
+            }, 3000);
+        };
+
+        window.toggleHeatmap = function() {
+             // Implementation for toggling heatmap layer if needed
+             console.log("Heatmap toggled");
+        };
+
+        window.toggleMarkers = function() {
+             // Implementation for toggling markers if needed
+             console.log("Markers toggled");
+        };
+
+        // --- DISPUTES ---
+        const disputesData = [
+            { id: 'D-2024-001', reporter: 'John Doe (User)', against: 'Raju Pipes', issue: 'Overcharged ₹500', status: 'Open' },
+            { id: 'D-2024-002', reporter: 'Anita Care', against: 'Sarah Smith', issue: 'Abusive Language', status: 'Open' }
+        ];
+
+        window.renderDisputes = function() {
+            const tbody = document.getElementById('disputes-table-body');
+            tbody.innerHTML = '';
+            disputesData.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white/5 transition-colors";
+
+                let statusBadge = d.status === 'Open'
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-bold border border-red-500/20"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Open</span>`
+                    : `<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">Resolved</span>`;
+
+                let actionBtn = d.status === 'Open'
+                    ? `<button onclick="window.resolveDispute('${d.id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-blue-500/20">Intervene</button>`
+                    : `<span class="text-xs text-gray-500 font-mono">CASE CLOSED</span>`;
+
+                tr.innerHTML = `
+                    <td class="p-5 font-mono text-xs text-gray-500">${d.id}</td>
+                    <td class="p-5 font-bold text-white">${d.reporter}</td>
+                    <td class="p-5 text-gray-300">${d.against}</td>
+                    <td class="p-5"><span class="bg-white/5 px-2 py-1 rounded text-xs border border-white/10">${d.issue}</span></td>
+                    <td class="p-5">${statusBadge}</td>
+                    <td class="p-5 text-right">${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        window.resolveDispute = function(id) {
+            const d = disputesData.find(x => x.id === id);
+            if(d && confirm('Mark this dispute as resolved?')) {
+                d.status = 'Resolved';
+                window.renderDisputes();
+            }
+        };
+
+        window.viewDoc = function(url, name) {
+            const docImg = document.getElementById('docImg');
+            if (docImg) docImg.src = url;
+            const docTitle = document.getElementById('docTitle');
+            if (docTitle) docTitle.textContent = name + "'s Documents";
+            const docModal = document.getElementById('docModal');
+            if (docModal) {
+                docModal.classList.remove('hidden');
+                docModal.classList.add('flex');
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+/* --- FONTS --- */
+/* Set the defaults matching your Google Fonts imports */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #0a0f1c; /* Matches your Tailwind bg */
+}
+
+/* Custom utility class for Space Grotesk font */
+.font-grotesk {
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+/* --- ANIMATIONS --- */
+/* Defines the 'animate-fade-up' class used in your HTML */
+@keyframes fade-up {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-up {
+    animation: fade-up 0.6s ease-out forwards;
+}
+
+/* Shimmer Animation for Skeleton Loaders */
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+/* --- UTILITIES --- */
+/* Hides scrollbar for the category filters (Horizontal Scroll) */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Glassmorphism utility overrides (optional, reinforces Tailwind) */
+.backdrop-blur-md {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* --- CUSTOM SCROLLBAR FOR THE PAGE --- */
+/* Makes the main scrollbar dark to match your theme */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0a0f1c; 
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1e293b; 
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6; /* Blue highlight on hover */
+}
